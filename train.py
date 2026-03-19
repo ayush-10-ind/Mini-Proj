@@ -10,10 +10,10 @@ import torch.optim as optim
 # -------------------------------
 transform = transforms.Compose([
     transforms.Grayscale(num_output_channels=1),
-    transforms.Resize((224, 224)),
-    transforms.ToTensor()
+    transforms.Resize((224,224)),
+    transforms.ToTensor(),
+    transforms.Normalize((0.5,), (0.5,))
 ])
-
 
 # -------------------------------
 # Load datasets
@@ -33,23 +33,23 @@ print("Classes:", train_dataset.classes)
 # -------------------------------
 # CNN Model
 # -------------------------------
-class SimpleCNN(nn.Module):
-
+class BetterCNN(nn.Module):
     def __init__(self):
-        super(SimpleCNN, self).__init__()
+        super(BetterCNN, self).__init__()
 
-        self.conv = nn.Conv2d(1, 16, 3)
-        self.pool = nn.MaxPool2d(2, 2)
+        self.conv1 = nn.Conv2d(1,16,3)
+        self.conv2 = nn.Conv2d(16,32,3)
 
-        self.fc = nn.Linear(16 * 111 * 111, 2)
+        self.pool = nn.MaxPool2d(2,2)
 
-    def forward(self, x):
+        self.fc = nn.Linear(32*54*54,2)
 
-        x = torch.relu(self.conv(x))
-        x = self.pool(x)
+    def forward(self,x):
 
-        x = x.view(x.size(0), -1)
+        x = self.pool(torch.relu(self.conv1(x)))
+        x = self.pool(torch.relu(self.conv2(x)))
 
+        x = x.view(x.size(0),-1)
         x = self.fc(x)
 
         return x
@@ -58,7 +58,7 @@ class SimpleCNN(nn.Module):
 # -------------------------------
 # Create model
 # -------------------------------
-model = SimpleCNN()
+model = BetterCNN()
 
 
 # -------------------------------
@@ -126,6 +126,5 @@ print("----------------------")
 print("Training Accuracy  :", train_acc, "%")
 print("Validation Accuracy:", val_acc, "%")
 print("Test Accuracy      :", test_acc, "%")
-
 torch.save(model.state_dict(), "model.pth")
-print("Model saved successfully!")
+print("Model saved!")
