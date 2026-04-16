@@ -1,23 +1,21 @@
-from torchvision import datasets, transforms
+from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
-
-# -------------------------------
 # Image transformations
-# -------------------------------
+
 transform = transforms.Compose([
-    transforms.Grayscale(num_output_channels=1),
     transforms.Resize((224,224)),
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomRotation(10),
     transforms.ToTensor(),
-    transforms.Normalize((0.5,), (0.5,))
+    transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5))
 ])
 
-# -------------------------------
 # Load datasets
-# -------------------------------
+
 train_dataset = datasets.ImageFolder("data/train", transform=transform)
 val_dataset = datasets.ImageFolder("data/val", transform=transform)
 test_dataset = datasets.ImageFolder("data/test", transform=transform)
@@ -29,61 +27,36 @@ test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 print("Total training images:", len(train_dataset))
 print("Classes:", train_dataset.classes)
 
+# ResNet Model
 
-# -------------------------------
-# CNN Model
-# -------------------------------
-class BetterCNN(nn.Module):
-    def __init__(self):
-        super(BetterCNN, self).__init__()
+model = models.resnet18(pretrained=True)
 
-        self.conv1 = nn.Conv2d(1,16,3)
-        self.conv2 = nn.Conv2d(16,32,3)
+# Modify final layer
+model.fc = nn.Linear(model.fc.in_features, 2)
 
-        self.pool = nn.MaxPool2d(2,2)
+# Freeze base layers (optional but recommended)
+for param in model.parameters():
+    param.requires_grad = False
 
-        self.fc = nn.Linear(32*54*54,2)
+for param in model.fc.parameters():
+    param.requires_grad = True
 
-    def forward(self,x):
-
-        x = self.pool(torch.relu(self.conv1(x)))
-        x = self.pool(torch.relu(self.conv2(x)))
-
-        x = x.view(x.size(0),-1)
-        x = self.fc(x)
-
-        return x
-
-
-# -------------------------------
-# Create model
-# -------------------------------
-model = BetterCNN()
-
-
-# -------------------------------
 # Loss and Optimizer
-# -------------------------------
+
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.fc.parameters(), lr=0.001)
 
-
-# -------------------------------
 # Accuracy Function
-# -------------------------------
-def calculate_accuracy(model, loader):
 
+def calculate_accuracy(model, loader):
     correct = 0
     total = 0
 
     model.eval()
 
     with torch.no_grad():
-
         for images, labels in loader:
-
             outputs = model(images)
-
             _, predicted = torch.max(outputs, 1)
 
             total += labels.size(0)
@@ -91,13 +64,10 @@ def calculate_accuracy(model, loader):
 
     return 100 * correct / total
 
-
-# -------------------------------
 # Training Loop
-# -------------------------------
-model.train()
+for epoch in range(5):
 
-for epoch in range(3):
+    model.train()
 
     for images, labels in train_loader:
 
@@ -111,20 +81,20 @@ for epoch in range(3):
 
         optimizer.step()
 
-    print("Epoch", epoch + 1, "finished")
+    print(f"Epoch {epoch+1} finished")
 
 
-# -------------------------------
 # Evaluate Model
-# -------------------------------
+
 train_acc = calculate_accuracy(model, train_loader)
 val_acc = calculate_accuracy(model, val_loader)
 test_acc = calculate_accuracy(model, test_loader)
 
 print("\nModel Performance")
-print("----------------------")
 print("Training Accuracy  :", train_acc, "%")
 print("Validation Accuracy:", val_acc, "%")
 print("Test Accuracy      :", test_acc, "%")
+
+# Save Model
 torch.save(model.state_dict(), "model.pth")
-print("Model saved!")
+print("ResNet model saved!")
